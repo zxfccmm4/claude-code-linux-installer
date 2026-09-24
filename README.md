@@ -127,6 +127,18 @@ claude
 ./install-claude-code.sh --skip-install
 ```
 
+## 首次启动仍要求登录
+
+自定义 `ANTHROPIC_BASE_URL` 和 API Token 时，Claude Code 某些版本仍可能显示账户登录页。脚本会安全合并以下状态，避免首次启动被登录流程阻塞：
+
+```json
+{
+  "hasCompletedOnboarding": true
+}
+```
+
+默认状态文件是 `~/.claude.json`；原有字段会被保留，不会整文件覆盖。
+
 ## 验证
 
 ```bash

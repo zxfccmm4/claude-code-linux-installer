@@ -519,6 +519,89 @@ PY
   ok "API 配置已合并到 ${settings_file}（权限 600）。"
 }
 
+mark_onboarding_complete() {
+  if [[ -n "${CLAUDE_CONFIG_DIR:-}" ]]; then
+    state_file="${CLAUDE_CONFIG_DIR}/.claude.json"
+  else
+    state_file="$HOME/.claude.json"
+  fi
+
+  if [[ $DRY_RUN -eq 1 ]]; then
+    log "将把 hasCompletedOnboarding=true 安全合并到 ${state_file}，以便自定义 API 首次启动时跳过账户登录页。"
+    return 0
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    CLAUDE_STATE_FILE="$state_file" python3 - <<'PY_STATE'
+import json
+import os
+import pathlib
+import tempfile
+
+path = pathlib.Path(os.environ["CLAUDE_STATE_FILE"]).expanduser()
+if path.exists() and path.stat().st_size:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise SystemExit(f"现有 Claude 状态文件不是有效 JSON，未做修改：{path}: {exc}")
+    if not isinstance(data, dict):
+        raise SystemExit(f"现有 Claude 状态文件根节点不是 JSON 对象，未做修改：{path}")
+else:
+    data = {}
+
+data["hasCompletedOnboarding"] = True
+path.parent.mkdir(parents=True, exist_ok=True)
+fd, tmp = tempfile.mkstemp(prefix=".claude-state.", suffix=".json", dir=str(path.parent))
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, path)
+    os.chmod(path, 0o600)
+finally:
+    if os.path.exists(tmp):
+        os.unlink(tmp)
+PY_STATE
+    ok "已标记 Claude Code 首次引导完成：${state_file}。"
+    return 0
+  fi
+
+  if command -v node >/dev/null 2>&1; then
+    CLAUDE_STATE_FILE="$state_file" node <<'NODE_STATE'
+const fs = require('fs');
+const path = require('path');
+const target = process.env.CLAUDE_STATE_FILE;
+let data = {};
+if (fs.existsSync(target) && fs.statSync(target).size > 0) {
+  data = JSON.parse(fs.readFileSync(target, 'utf8'));
+  if (!data || Array.isArray(data) || typeof data !== 'object') {
+    throw new Error(`现有 Claude 状态文件根节点不是 JSON 对象：${target}`);
+  }
+}
+data.hasCompletedOnboarding = true;
+fs.mkdirSync(path.dirname(target), { recursive: true });
+const tmp = `${target}.tmp.${process.pid}`;
+fs.writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, { mode: 0o600 });
+fs.renameSync(tmp, target);
+fs.chmodSync(target, 0o600);
+NODE_STATE
+    ok "已标记 Claude Code 首次引导完成：${state_file}。"
+    return 0
+  fi
+
+  if [[ ! -e "$state_file" ]]; then
+    umask 077
+    printf '{\n  "hasCompletedOnboarding": true\n}\n' > "$state_file"
+    chmod 600 "$state_file"
+    ok "已创建 Claude Code 首次引导状态：${state_file}。"
+  else
+    warn "缺少 python3/node，无法安全合并 ${state_file}；首次启动时可能仍显示账户登录页。"
+  fi
+}
+
 if [[ $SKIP_INSTALL -eq 0 ]]; then
   if [[ "$INSTALL_METHOD" == "npm" ]]; then
     install_claude_npm
@@ -535,6 +618,7 @@ if [[ "$CONFIG_MODE" == "shell" ]]; then
 else
   write_settings_config
 fi
+mark_onboarding_complete
 
 if [[ $DRY_RUN -eq 0 ]]; then
   claude_bin="$(command -v claude 2>/dev/null || true)"
