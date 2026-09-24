@@ -7,6 +7,7 @@
 3. 使用 npm 安装 Claude Code：`@anthropic-ai/claude-code`。
 4. 配置自定义 `ANTHROPIC_BASE_URL` 和 API Key/Token。
 5. 将配置接入 `~/.bashrc`、`~/.bash_profile` 和 `~/.zshrc`。
+6. 可选关闭新版 Auto mode 服务端检查，兼容暂未适配的第三方网关。
 
 > 截至 2026-09-24，Claude Code 官方 npm 安装文档要求 Node.js 22 或更高。因此脚本检查 **Node.js >= 22**，而不是旧教程中的 >= 18。官方同时更推荐无需 Node.js 的原生安装方式，本脚本也提供 `--install-method native`。
 
@@ -140,6 +141,88 @@ claude
 
 默认状态文件是 `~/.claude.json`；原有字段会被保留，不会整文件覆盖。
 
+## 更改模型
+
+模型名称必须以你的 API 服务商或第三方网关实际支持的模型 ID 为准。
+
+在当前 Claude Code 会话中切换：
+
+```text
+/model
+```
+
+单次启动时指定：
+
+```bash
+claude --model MODEL_ID
+```
+
+永久修改 shell 配置：
+
+```bash
+sed -i "s|^export ANTHROPIC_MODEL=.*|export ANTHROPIC_MODEL='MODEL_ID'|" \
+  ~/.config/claude-code/env
+source ~/.config/claude-code/env
+```
+
+如果配置文件里原本没有 `ANTHROPIC_MODEL`，可以直接追加：
+
+```bash
+echo "export ANTHROPIC_MODEL='MODEL_ID'" >> ~/.config/claude-code/env
+source ~/.config/claude-code/env
+```
+
+取消固定模型，让 Claude Code 自行选择：
+
+```bash
+sed -i '/^export ANTHROPIC_MODEL=/d' ~/.config/claude-code/env
+unset ANTHROPIC_MODEL
+```
+
+## Auto mode 网关兼容提示
+
+Claude Code 新版 Auto mode 可以把分类器请求交给 Anthropic 服务端处理，从而不再单独向用户计费。第三方网关如果没有完整透传 `safeguards`、`safeguard_results` 和相关工具调用字段，Claude Code 会显示网关暂不兼容的提示。此时功能不会中断，但分类器请求仍按以前的方式计费。
+
+如果只是希望继续使用并隐藏该提示，可以重新运行脚本并关闭服务端检查：
+
+```bash
+./install-claude-code.sh \
+  --skip-install \
+  --base-url "https://gateway.example.com" \
+  --token "sk-xxxx" \
+  --auth-mode auth-token \
+  --auto-mode-server off \
+  --non-interactive
+```
+
+也可以直接修改已有配置：
+
+```bash
+sed -i '/^export CLAUDE_CODE_AUTO_MODE_SERVER=/d' \
+  ~/.config/claude-code/env
+echo 'export CLAUDE_CODE_AUTO_MODE_SERVER=0' \
+  >> ~/.config/claude-code/env
+source ~/.config/claude-code/env
+```
+
+这不会关闭 Auto mode，只会关闭新版服务端检查尝试；分类器请求仍按原方式处理和计费。
+
+网关完成适配后，恢复默认行为：
+
+```bash
+sed -i '/^export CLAUDE_CODE_AUTO_MODE_SERVER=/d' \
+  ~/.config/claude-code/env
+unset CLAUDE_CODE_AUTO_MODE_SERVER
+```
+
+或者使用安装脚本重新写入配置：
+
+```bash
+./install-claude-code.sh --auto-mode-server auto
+```
+
+详细的网关适配要求参见 [Claude Code Auto mode classifier billing](https://code.claude.com/docs/en/auto-mode-classifier-billing)。
+
 ## 验证
 
 ```bash
@@ -158,6 +241,7 @@ claude doctor
 --install-method npm|native
 --version latest|stable|具体版本
 --config-mode shell|settings
+--auto-mode-server auto|off
 --skip-node
 --skip-install
 --force-install

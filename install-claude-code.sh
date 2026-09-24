@@ -14,6 +14,7 @@ MODEL="${CLAUDE_MODEL:-${ANTHROPIC_MODEL:-}}"
 INSTALL_METHOD="${CLAUDE_INSTALL_METHOD:-npm}"
 VERSION="${CLAUDE_VERSION:-latest}"
 CONFIG_MODE="${CLAUDE_CONFIG_MODE:-shell}"
+AUTO_MODE_SERVER="${CLAUDE_AUTO_MODE_SERVER:-auto}"
 
 AUTH_MODE_EXPLICIT=0
 [[ -z "${CLAUDE_AUTH_MODE:-}" ]] || AUTH_MODE_EXPLICIT=1
@@ -46,6 +47,9 @@ usage() {
   --config-mode MODE          shell 或 settings，默认 shell
                               shell: 安全写入独立 env 文件，由 bash/zsh 配置加载
                               settings: 合并到 ~/.claude/settings.json
+  --auto-mode-server MODE     auto 或 off，默认 auto
+                              off: 写入 CLAUDE_CODE_AUTO_MODE_SERVER=0，
+                              用于暂时兼容尚未适配新版 Auto mode 的第三方网关
   --skip-node                 不检测/安装 Node.js（仅 npm 安装模式有效）
   --skip-install              不安装 Claude Code，只更新 API 配置
   --force-install             即使检测到 Claude Code，也备份旧入口并重新安装
@@ -101,6 +105,10 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || die "--config-mode 缺少参数"
       CONFIG_MODE="$2"; shift 2 ;;
     --config-mode=*) CONFIG_MODE="${1#*=}"; shift ;;
+    --auto-mode-server)
+      [[ $# -ge 2 ]] || die "--auto-mode-server 缺少参数"
+      AUTO_MODE_SERVER="$2"; shift 2 ;;
+    --auto-mode-server=*) AUTO_MODE_SERVER="${1#*=}"; shift ;;
     --skip-node) SKIP_NODE=1; shift ;;
     --skip-install) SKIP_INSTALL=1; shift ;;
     --force-install) FORCE_INSTALL=1; shift ;;
@@ -128,6 +136,10 @@ esac
 case "$CONFIG_MODE" in
   shell|settings) ;;
   *) die "--config-mode 只能是 shell 或 settings" ;;
+esac
+case "$AUTO_MODE_SERVER" in
+  auto|off) ;;
+  *) die "--auto-mode-server 只能是 auto 或 off" ;;
 esac
 [[ "$VERSION" =~ ^(latest|stable|[0-9]+\.[0-9]+\.[0-9]+)$ ]] || \
   die "--version 必须是 latest、stable 或具体版本号（例如 2.1.198）"
@@ -433,6 +445,11 @@ write_shell_config() {
     else
       printf 'unset ANTHROPIC_MODEL\n'
     fi
+    if [[ "$AUTO_MODE_SERVER" == "off" ]]; then
+      printf 'export CLAUDE_CODE_AUTO_MODE_SERVER=0\n'
+    else
+      printf 'unset CLAUDE_CODE_AUTO_MODE_SERVER\n'
+    fi
   } > "$env_file"
   chmod 600 "$env_file"
 
@@ -469,6 +486,7 @@ write_settings_config() {
   CLAUDE_CFG_SECRET="$API_SECRET" \
   CLAUDE_CFG_AUTH_MODE="$AUTH_MODE" \
   CLAUDE_CFG_MODEL="$MODEL" \
+  CLAUDE_CFG_AUTO_MODE_SERVER="$AUTO_MODE_SERVER" \
   python3 - "$settings_file" <<'PY'
 import json
 import os
@@ -503,6 +521,10 @@ if model:
     env["ANTHROPIC_MODEL"] = model
 else:
     env.pop("ANTHROPIC_MODEL", None)
+if os.environ.get("CLAUDE_CFG_AUTO_MODE_SERVER") == "off":
+    env["CLAUDE_CODE_AUTO_MODE_SERVER"] = "0"
+else:
+    env.pop("CLAUDE_CODE_AUTO_MODE_SERVER", None)
 
 path.parent.mkdir(parents=True, exist_ok=True)
 fd, tmp = tempfile.mkstemp(prefix="settings.", suffix=".json", dir=str(path.parent))
