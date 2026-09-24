@@ -21,6 +21,8 @@ curl -fsSL https://raw.githubusercontent.com/zxfccmm4/claude-code-linux-installe
 ## 下载后直接运行
 
 ```bash
+curl -fLo install-claude-code.sh \
+  https://raw.githubusercontent.com/zxfccmm4/claude-code-linux-installer/main/install-claude-code.sh
 chmod +x install-claude-code.sh
 ./install-claude-code.sh
 ```

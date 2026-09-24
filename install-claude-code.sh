@@ -141,15 +141,38 @@ if [[ -z "$API_SECRET" ]]; then
   fi
 fi
 
+prompt_read() {
+  local target_var="$1"
+  local prompt="$2"
+  local silent="${3:-0}"
+  local value=""
+
+  # curl ... | bash 会占用标准输入来读取脚本本身，因此交互输入必须从控制终端读取。
+  # 没有控制终端时，要求调用方改用非交互参数，避免误把后续脚本源码当成答案。
+  if [[ ! -r /dev/tty ]]; then
+    die "当前没有可用的交互终端；请使用 --non-interactive，并传入 --base-url 和 --token/--api-key。"
+  fi
+  if [[ "$silent" == "1" ]]; then
+    if ! IFS= read -r -s -p "$prompt" value </dev/tty; then
+      die "无法从终端读取输入；请改用 --non-interactive。"
+    fi
+  else
+    if ! IFS= read -r -p "$prompt" value </dev/tty; then
+      die "无法从终端读取输入；请改用 --non-interactive。"
+    fi
+  fi
+  printf -v "$target_var" '%s' "$value"
+}
+
 if [[ $NON_INTERACTIVE -eq 0 ]]; then
   printf '\nClaude Code Linux 一键安装/配置\n'
   printf '%s\n' '--------------------------------'
 
   if [[ -z "$BASE_URL" ]]; then
-    read -r -p "Base URL（例如 https://gateway.example.com）: " BASE_URL
+    prompt_read BASE_URL "Base URL（例如 https://gateway.example.com）: "
   fi
   if [[ -z "$API_SECRET" ]]; then
-    read -r -s -p "API Key/Token（输入不会显示）: " API_SECRET
+    prompt_read API_SECRET "API Key/Token（输入不会显示）: " 1
     printf '\n'
   fi
   if [[ $AUTH_MODE_EXPLICIT -eq 0 ]]; then
@@ -157,7 +180,7 @@ if [[ $NON_INTERACTIVE -eq 0 ]]; then
     printf '  1) auth-token -> Authorization: Bearer（代理网关常用，默认）\n'
     printf '  2) api-key    -> X-Api-Key（Anthropic 官方 API 常用）\n'
     auth_choice=""
-    read -r -p "请选择 [1]: " auth_choice
+    prompt_read auth_choice "请选择 [1]: "
     case "${auth_choice:-1}" in
       1) AUTH_MODE="auth-token" ;;
       2) AUTH_MODE="api-key" ;;
@@ -165,7 +188,7 @@ if [[ $NON_INTERACTIVE -eq 0 ]]; then
     esac
   fi
   if [[ -z "$MODEL" ]]; then
-    read -r -p "默认模型（可留空）: " MODEL
+    prompt_read MODEL "默认模型（可留空）: "
   fi
 fi
 
