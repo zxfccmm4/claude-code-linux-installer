@@ -79,6 +79,7 @@ CLAUDE_AUTH_MODE="auth-token" \
 
 ```bash
 source ~/.config/claude-code/env
+hash -r
 cd your-project-folder
 claude
 ```

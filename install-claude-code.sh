@@ -417,6 +417,9 @@ write_shell_config() {
   umask 077
   {
     printf '%s\n' "$marker"
+    # 让“source env”同时刷新 Claude Code 的用户级安装路径，避免当前 shell 找不到命令。
+    # shellcheck disable=SC2016  # 变量需保留到用户 source 配置时再展开。
+    printf '%s\n' 'case ":${PATH:-}:" in' '  *:"$HOME/.local/bin":*) ;;' '  *) export PATH="$HOME/.local/bin:${PATH:-}" ;;' 'esac'
     printf 'export ANTHROPIC_BASE_URL=%s\n' "$(shell_quote "$BASE_URL")"
     if [[ "$AUTH_MODE" == "auth-token" ]]; then
       printf 'export ANTHROPIC_AUTH_TOKEN=%s\n' "$(shell_quote "$API_SECRET")"
