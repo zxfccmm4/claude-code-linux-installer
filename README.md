@@ -113,6 +113,20 @@ claude
   --non-interactive
 ```
 
+## 已存在 Claude Code 时
+
+脚本检测到可正常运行的 `claude` 命令时会自动跳过重复安装，只继续写入 API 配置，避免 npm 的 `EEXIST` 冲突。需要强制更新或重装时使用：
+
+```bash
+./install-claude-code.sh --force-install
+```
+
+如果上一次安装已经中断，而现有 Claude Code 可以正常运行，也可以仅写入配置：
+
+```bash
+./install-claude-code.sh --skip-install
+```
+
 ## 验证
 
 ```bash
@@ -133,6 +147,7 @@ claude doctor
 --config-mode shell|settings
 --skip-node
 --skip-install
+--force-install
 --non-interactive
 --dry-run
 ```

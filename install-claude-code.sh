@@ -20,6 +20,7 @@ AUTH_MODE_EXPLICIT=0
 NON_INTERACTIVE=0
 SKIP_NODE=0
 SKIP_INSTALL=0
+FORCE_INSTALL=0
 DRY_RUN=0
 
 log()  { printf '\033[1;34m[INFO]\033[0m %s\n' "$*"; }
@@ -47,6 +48,7 @@ usage() {
                               settings: 合并到 ~/.claude/settings.json
   --skip-node                 不检测/安装 Node.js（仅 npm 安装模式有效）
   --skip-install              不安装 Claude Code，只更新 API 配置
+  --force-install             即使检测到 Claude Code，也备份旧入口并重新安装
   --non-interactive           非交互模式，缺少 Base URL/Token 时直接报错
   --dry-run                   只显示操作，不安装或写文件
   -h, --help                  显示帮助
@@ -101,6 +103,7 @@ while [[ $# -gt 0 ]]; do
     --config-mode=*) CONFIG_MODE="${1#*=}"; shift ;;
     --skip-node) SKIP_NODE=1; shift ;;
     --skip-install) SKIP_INSTALL=1; shift ;;
+    --force-install) FORCE_INSTALL=1; shift ;;
     --non-interactive) NON_INTERACTIVE=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -345,12 +348,39 @@ ensure_local_bin_path() {
 }
 
 install_claude_npm() {
+  ensure_local_bin_path
+
+  local_claude="$HOME/.local/bin/claude"
+  existing_claude=""
+  if [[ -x "$local_claude" ]]; then
+    existing_claude="$local_claude"
+  elif command -v claude >/dev/null 2>&1; then
+    existing_claude="$(command -v claude)"
+  fi
+
+  if [[ -n "$existing_claude" && $FORCE_INSTALL -eq 0 ]]; then
+    if existing_version="$($existing_claude --version 2>/dev/null)"; then
+      ok "已检测到 Claude Code ${existing_version:-$existing_claude}，跳过重复安装。"
+      log "如需强制更新/重装，请重新运行并添加 --force-install。"
+      return 0
+    fi
+    warn "检测到无法正常运行的 Claude Code 入口：$existing_claude；将继续安装。"
+  fi
+
   [[ $SKIP_NODE -eq 1 ]] || install_node
   if [[ $DRY_RUN -eq 0 ]]; then
     command -v node >/dev/null 2>&1 || die "未找到 Node.js；请取消 --skip-node 或先手动安装。"
     command -v npm >/dev/null 2>&1 || die "未找到 npm；请取消 --skip-node 或先手动安装。"
   fi
-  ensure_local_bin_path
+
+  # npm 遇到原生安装器或旧安装遗留的同名入口时会报 EEXIST。
+  # 不直接删除用户文件，而是先备份，便于需要时恢复。
+  if [[ -e "$local_claude" || -L "$local_claude" ]]; then
+    backup_path="${local_claude}.backup.$(date +%Y%m%d-%H%M%S).$$"
+    warn "发现冲突入口 $local_claude，将备份为 $backup_path。"
+    run mv "$local_claude" "$backup_path"
+  fi
+
   package="@anthropic-ai/claude-code@$VERSION"
   log "正在通过 npm 安装 ${package}……"
   run npm install --global --prefix "$HOME/.local" "$package"
