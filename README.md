@@ -1,39 +1,56 @@
-# Claude Code Linux 一键安装器
+<div align="center">
 
-面向 Linux / WSL 的 Claude Code 安装与配置脚本。支持自动安装运行环境、自定义 Anthropic 兼容 API、切换认证方式、配置默认模型，并处理常见的 PATH、重复安装和首次登录问题。
+# 🚀 Claude Code Linux 一键安装器
+
+**在 Linux / WSL 上快速安装 Claude Code，并配置自定义 Anthropic 兼容 API。**
+
+<p>
+  <img alt="Platform" src="https://img.shields.io/badge/Platform-Linux%20%7C%20WSL-2F81F7?style=flat-square&logo=linux&logoColor=white">
+  <img alt="Architecture" src="https://img.shields.io/badge/Arch-x86__64%20%7C%20ARM64-8250DF?style=flat-square">
+  <img alt="Shell" src="https://img.shields.io/badge/Shell-Bash%20%7C%20Zsh-4EAA25?style=flat-square&logo=gnubash&logoColor=white">
+  <img alt="Node.js" src="https://img.shields.io/badge/Node.js-%E2%89%A5%2022-339933?style=flat-square&logo=nodedotjs&logoColor=white">
+</p>
+
+<p>
+  自动安装 · 自定义 Base URL · 双认证模式 · 默认模型 · Auto mode 网关兼容
+</p>
+
+</div>
 
 > [!IMPORTANT]
 > 本项目不是 Anthropic 官方项目。使用第三方 API 网关前，请确认它兼容 Anthropic Messages API，并充分了解其安全性、隐私政策和计费方式。
 
 ## 目录
 
-- [快速开始](#快速开始)
-- [系统要求](#系统要求)
-- [安装方式](#安装方式)
-- [非交互安装](#非交互安装)
-- [认证与配置](#认证方式)
-- [常用操作](#常用操作)
-- [Auto mode 与第三方网关](#auto-mode-与第三方网关)
-- [常见问题](#常见问题)
-- [参数说明](#参数说明)
-- [安全建议](#安全建议)
+| 入门 | 配置 | 使用与维护 |
+|---|---|---|
+| [快速开始](#快速开始) | [认证方式](#认证方式) | [常用操作](#常用操作) |
+| [系统要求](#系统要求) | [配置保存位置](#配置保存位置) | [Auto mode](#auto-mode-与第三方网关) |
+| [安装方式](#安装方式) | [参数说明](#参数说明) | [常见问题](#常见问题) |
 
 ## 功能特性
 
-- 自动检测 Linux / WSL、CPU 架构和现有 Claude Code 安装
-- 支持 x86_64 / AMD64 和 ARM64 / AArch64
-- 支持 npm 安装与 Anthropic 原生安装器
-- npm 模式自动检测并安装 Node.js 22+
-- 支持 Debian、Ubuntu、RHEL、CentOS、Fedora、Alpine、Arch Linux 等常见发行版
-- 自定义 `ANTHROPIC_BASE_URL`
-- 支持 `ANTHROPIC_AUTH_TOKEN` 与 `ANTHROPIC_API_KEY`
-- 可配置默认模型 `ANTHROPIC_MODEL`
-- 密钥独立保存，配置文件权限设置为 `600`
-- 自动接入 Bash / Zsh，并补充 `$HOME/.local/bin` 到 `PATH`
-- 自动跳过自定义 API 场景下的首次账户登录引导
-- 避免 npm 重复安装引起的 `EEXIST` 错误
-- 可选兼容尚未适配新版 Auto mode 的第三方网关
-- 支持交互、非交互和 dry-run 模式
+| 📦 安装与兼容 | 🔐 API 与配置 | 🛠️ 稳定性与维护 |
+|---|---|---|
+| Linux / WSL | 自定义 `ANTHROPIC_BASE_URL` | 自动跳过重复安装 |
+| x86_64 / ARM64 | Token / API Key 双认证 | 规避 npm `EEXIST` |
+| npm / 原生安装器 | 自定义默认模型 | 自动修复用户级 PATH |
+| Node.js 22+ 自动安装 | 密钥文件权限 `600` | 跳过首次登录引导 |
+| 主流 Linux 发行版 | Bash / Zsh 自动接入 | 交互 / 非交互 / dry-run |
+| 已安装时自动跳过 | `shell` / `settings` 两种模式 | Auto mode 网关兼容选项 |
+
+### 安装流程
+
+```mermaid
+flowchart LR
+    A[运行安装脚本] --> B{Claude Code 已安装?}
+    B -- 否 --> C[安装 Node.js / Claude Code]
+    B -- 是 --> D[跳过重复安装]
+    C --> E[写入 API 配置]
+    D --> E
+    E --> F[接入 Bash / Zsh]
+    F --> G[进入项目运行 claude]
+```
 
 ## 快速开始
 
@@ -327,7 +344,8 @@ unset CLAUDE_CODE_AUTO_MODE_SERVER
 
 ## 常见问题
 
-### `claude: command not found`
+<details>
+<summary><strong>❓ claude: command not found</strong></summary>
 
 先执行：
 
@@ -344,7 +362,10 @@ claude --version
 ls -l ~/.local/bin/claude
 ```
 
-### npm 报错 `EEXIST`
+</details>
+
+<details>
+<summary><strong>❓ npm 报错 EEXIST</strong></summary>
 
 新版脚本会优先检测已有 Claude Code，并避免重复安装。现有命令可以运行时，直接更新配置：
 
@@ -358,7 +379,10 @@ ls -l ~/.local/bin/claude
 ./install-claude-code.sh --force-install
 ```
 
-### 首次启动仍显示登录方式
+</details>
+
+<details>
+<summary><strong>❓ 首次启动仍显示登录方式</strong></summary>
 
 自定义 Base URL 和 Token 时，脚本会把下面的状态安全合并到 `~/.claude.json`：
 
@@ -374,19 +398,27 @@ ls -l ~/.local/bin/claude
 ./install-claude-code.sh --skip-install
 ```
 
-### `curl | bash` 交互输入异常
+</details>
+
+<details>
+<summary><strong>❓ curl | bash 交互输入异常</strong></summary>
 
 新版脚本会从 `/dev/tty` 读取交互输入，不会把后续脚本源码误读为选项。如果当前环境没有控制终端，请先下载脚本，或者改用 `--non-interactive`。
 
-### Base URL 无法使用
+</details>
 
-确认：
+<details>
+<summary><strong>❓ Base URL 无法使用</strong></summary>
+
+请依次确认：
 
 - 地址以 `http://` 或 `https://` 开头
 - URL 中没有空格
 - 服务支持 Anthropic Messages API
 - 认证方式与网关要求一致
 - 模型 ID 确实存在于该网关
+
+</details>
 
 ## 参数说明
 
@@ -427,13 +459,23 @@ ls -l ~/.local/bin/claude
 
 ## 安全建议
 
+> [!CAUTION]
+> `~/.config/claude-code/env` 和 `~/.claude/settings.json` 可能包含敏感凭据，请勿公开上传或分享。
+
 - 生产环境只使用 HTTPS Base URL
 - 不要把真实 Token 提交到 Git、脚本、截图或聊天记录
 - 优先通过交互输入、环境变量或秘密管理器传递 Token
-- `~/.config/claude-code/env` 和 `~/.claude/settings.json` 包含敏感信息
 - 第三方网关可以看到请求内容和密钥，只使用可信服务
 - 定期轮换 API Token，并及时撤销泄露的凭据
 
-## License
+## 许可证
 
 本项目当前未附带开源许可证。未经许可，请勿将代码重新打包后冒充官方安装器发布。
+
+---
+
+<div align="center">
+
+如果这个项目对你有帮助，欢迎在 GitHub 上点一个 ⭐
+
+</div>
