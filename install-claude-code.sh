@@ -10,7 +10,9 @@ NODE_MAJOR_REQUIRED=22
 BASE_URL="${CLAUDE_BASE_URL:-${ANTHROPIC_BASE_URL:-}}"
 AUTH_MODE="${CLAUDE_AUTH_MODE:-auth-token}"
 API_SECRET="${CLAUDE_API_KEY:-}"
-MODEL="${CLAUDE_MODEL:-${ANTHROPIC_MODEL:-}}"
+# 注意：不能从 ANTHROPIC_MODEL 初始化——本脚本第一次运行会把它写进 shell 配置，
+# 之后每个新终端都带着旧值，导致第二次运行时交互提示被跳过、旧模型无法更改。
+MODEL="${CLAUDE_MODEL:-}"
 INSTALL_METHOD="${CLAUDE_INSTALL_METHOD:-npm}"
 VERSION="${CLAUDE_VERSION:-latest}"
 CONFIG_MODE="${CLAUDE_CONFIG_MODE:-shell}"
@@ -203,8 +205,24 @@ if [[ $NON_INTERACTIVE -eq 0 ]]; then
     esac
   fi
   if [[ -z "$MODEL" ]]; then
-    prompt_read MODEL "默认模型（可留空）: "
+    if [[ -n "${ANTHROPIC_MODEL:-}" ]]; then
+      # 第一次运行写入的 ANTHROPIC_MODEL 已在当前 shell 生效；必须重新询问，
+      # 否则第二次运行会静默沿用旧模型，用户无法更改。
+      prompt_read MODEL "默认模型（回车沿用 ${ANTHROPIC_MODEL}，输入 - 取消固定）: "
+      if [[ -z "$MODEL" ]]; then
+        MODEL="$ANTHROPIC_MODEL"
+      elif [[ "$MODEL" == "-" ]]; then
+        MODEL=""
+      fi
+    else
+      prompt_read MODEL "默认模型（可留空）: "
+    fi
   fi
+fi
+
+# 非交互模式且未显式传模型时，沿用环境中已有的 ANTHROPIC_MODEL，保持重跑幂等。
+if [[ $NON_INTERACTIVE -eq 1 && -z "$MODEL" ]]; then
+  MODEL="${ANTHROPIC_MODEL:-}"
 fi
 
 [[ -n "$BASE_URL" ]] || die "缺少 Base URL；请使用 --base-url 或 CLAUDE_BASE_URL。"
